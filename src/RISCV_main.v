@@ -791,25 +791,31 @@ module branch_unit (
     wire branch_lt  = ($signed(rs1_value) < $signed(rs2_value));
     wire branch_ltu = (rs1_value < rs2_value);
 
+    wire [31:0] jalr_target_full;
+    assign jalr_target_full = rs1_value + imm;
+
     always @(*) begin
         branch_taken  = 1'b0;
         branch_target = pc + imm[11:0];
 
         if (jump) begin
             branch_taken = 1'b1;
+
             if (opcode == 7'b1100111) begin
-                branch_target = (rs1_value + imm)[11:0] & 12'hFFE; // JALR
+                // JALR target = (rs1 + imm) & ~1
+                branch_target = jalr_target_full[11:0] & 12'hFFE;
             end else begin
-                branch_target = pc + imm[11:0]; // JAL
+                // JAL target = PC + immediate
+                branch_target = pc + imm[11:0];
             end
         end else if (branch) begin
             case (funct3)
-                3'b000: branch_taken = branch_eq;       // BEQ
-                3'b001: branch_taken = ~branch_eq;      // BNE
-                3'b100: branch_taken = branch_lt;       // BLT
-                3'b101: branch_taken = ~branch_lt;      // BGE
-                3'b110: branch_taken = branch_ltu;      // BLTU
-                3'b111: branch_taken = ~branch_ltu;     // BGEU
+                3'b000: branch_taken = branch_eq;    // BEQ
+                3'b001: branch_taken = ~branch_eq;   // BNE
+                3'b100: branch_taken = branch_lt;    // BLT
+                3'b101: branch_taken = ~branch_lt;   // BGE
+                3'b110: branch_taken = branch_ltu;   // BLTU
+                3'b111: branch_taken = ~branch_ltu;  // BGEU
                 default: branch_taken = 1'b0;
             endcase
         end
