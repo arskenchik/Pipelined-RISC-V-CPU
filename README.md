@@ -9,6 +9,8 @@ This project implements a clean 5-stage pipelined RISC-V CPU in Verilog. The des
 4. Memory Access (MEM)
 5. Write Back (WB)
 
+![Pipelined RISC-V-CPU](RISC-V-CPU.png)
+
 The CPU includes explicit pipeline registers between each stage, making the datapath easier to understand, debug, and extend.
 
 ## Features
