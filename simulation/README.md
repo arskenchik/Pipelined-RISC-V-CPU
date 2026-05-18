@@ -84,7 +84,7 @@ id_ex_flush
 
 This screenshot shows the partial passing result in the ModelSim transcript.
 
-![Sort console output](forloop_console_partial.png)
+![Sort console output](sort_console.png)
 
 ## Example ModelSim Commands
 
