@@ -33,6 +33,7 @@ module RISCV_TOP (
 );
 
     // ============================================================
+
     // Global memory chip-selects
     // ============================================================
     assign I_MEM_CSN = ~RSTn;
@@ -281,28 +282,40 @@ module RISCV_TOP (
     wire [31:0] ex_mem_rs2_data;
     wire [2:0]  ex_mem_funct3;
     wire [31:0] ex_mem_inst;
+    wire        ex_mem_branch;
+    wire        ex_mem_branch_taken;
+    wire        ex_mem_jump;
+    wire [11:0] ex_mem_branch_target;
 
     pipe_ex_mem u_pipe_ex_mem (
-        .clk             (CLK),
-        .rstn            (RSTn),
-        .reg_write_in    (id_ex_reg_write),
-        .mem_read_in     (id_ex_mem_read),
-        .mem_write_in    (id_ex_mem_write),
-        .mem_to_reg_in   (id_ex_mem_to_reg),
-        .alu_result_in   (ex_result_final),
-        .rs2_data_in     (forwarded_rs2),
-        .rd_in           (id_ex_rd),
-        .funct3_in       (id_ex_funct3),
-        .inst_in         (id_ex_inst),
-        .reg_write_out   (ex_mem_reg_write),
-        .mem_read_out    (ex_mem_mem_read),
-        .mem_write_out   (ex_mem_mem_write),
-        .mem_to_reg_out  (ex_mem_mem_to_reg),
-        .alu_result_out  (ex_mem_alu_result),
-        .rs2_data_out    (ex_mem_rs2_data),
-        .rd_out          (ex_mem_rd),
-        .funct3_out      (ex_mem_funct3),
-        .inst_out        (ex_mem_inst)
+        .clk               (CLK),
+        .rstn              (RSTn),
+        .reg_write_in      (id_ex_reg_write),
+        .mem_read_in       (id_ex_mem_read),
+        .mem_write_in      (id_ex_mem_write),
+        .mem_to_reg_in     (id_ex_mem_to_reg),
+        .alu_result_in     (ex_result_final),
+        .rs2_data_in       (forwarded_rs2),
+        .rd_in             (id_ex_rd),
+        .funct3_in         (id_ex_funct3),
+        .inst_in           (id_ex_inst),
+        .branch_in         (id_ex_branch),
+        .branch_taken_in   (branch_taken_ex),
+        .jump_in           (id_ex_jump),
+        .branch_target_in  (branch_target_ex),
+        .reg_write_out     (ex_mem_reg_write),
+        .mem_read_out      (ex_mem_mem_read),
+        .mem_write_out     (ex_mem_mem_write),
+        .mem_to_reg_out    (ex_mem_mem_to_reg),
+        .alu_result_out    (ex_mem_alu_result),
+        .rs2_data_out      (ex_mem_rs2_data),
+        .rd_out            (ex_mem_rd),
+        .funct3_out        (ex_mem_funct3),
+        .inst_out          (ex_mem_inst),
+        .branch_out        (ex_mem_branch),
+        .branch_taken_out  (ex_mem_branch_taken),
+        .jump_out          (ex_mem_jump),
+        .branch_target_out (ex_mem_branch_target)
     );
 
     // ============================================================
@@ -331,26 +344,43 @@ module RISCV_TOP (
     // ============================================================
     // MEM/WB pipeline register
     // ============================================================
+    wire        mem_wb_mem_write;
+    wire        mem_wb_branch;
+    wire        mem_wb_branch_taken;
+    wire        mem_wb_jump;
+    wire [11:0] mem_wb_branch_target;
     wire        mem_wb_mem_to_reg;
     wire [31:0] mem_wb_mem_data;
     wire [31:0] mem_wb_alu_result;
     wire [31:0] mem_wb_inst;
 
     pipe_mem_wb u_pipe_mem_wb (
-        .clk             (CLK),
-        .rstn            (RSTn),
-        .reg_write_in    (ex_mem_reg_write),
-        .mem_to_reg_in   (ex_mem_mem_to_reg),
-        .mem_data_in     (load_data_mem),
-        .alu_result_in   (ex_mem_alu_result),
-        .rd_in           (ex_mem_rd),
-        .inst_in         (ex_mem_inst),
-        .reg_write_out   (mem_wb_reg_write),
-        .mem_to_reg_out  (mem_wb_mem_to_reg),
-        .mem_data_out    (mem_wb_mem_data),
-        .alu_result_out  (mem_wb_alu_result),
-        .rd_out          (mem_wb_rd),
-        .inst_out        (mem_wb_inst)
+        .clk               (CLK),
+        .rstn              (RSTn),
+
+        .reg_write_in      (ex_mem_reg_write),
+        .mem_write_in      (ex_mem_mem_write),
+        .branch_in         (ex_mem_branch),
+        .branch_taken_in   (ex_mem_branch_taken),
+        .jump_in           (ex_mem_jump),
+        .branch_target_in  (ex_mem_branch_target),
+        .mem_to_reg_in     (ex_mem_mem_to_reg),
+        .mem_data_in       (load_data_mem),
+        .alu_result_in     (ex_mem_alu_result),
+        .rd_in             (ex_mem_rd),
+        .inst_in           (ex_mem_inst),
+
+        .reg_write_out     (mem_wb_reg_write),
+        .mem_write_out     (mem_wb_mem_write),
+        .branch_out        (mem_wb_branch),
+        .branch_taken_out  (mem_wb_branch_taken),
+        .jump_out          (mem_wb_jump),
+        .branch_target_out (mem_wb_branch_target),
+        .mem_to_reg_out    (mem_wb_mem_to_reg),
+        .mem_data_out      (mem_wb_mem_data),
+        .alu_result_out    (mem_wb_alu_result),
+        .rd_out            (mem_wb_rd),
+        .inst_out          (mem_wb_inst)
     );
 
     // ============================================================
@@ -369,11 +399,25 @@ module RISCV_TOP (
             NUM_INST    <= 32'd0;
             OUTPUT_PORT <= 32'd0;
         end else begin
-            if (mem_wb_inst != 32'h00000013 && mem_wb_inst !== 32'bx && mem_wb_inst != 32'd0) begin
+            if (mem_wb_inst != 32'h00000013 &&
+                mem_wb_inst !== 32'bx &&
+                mem_wb_inst != 32'd0) begin
+
                 NUM_INST <= NUM_INST + 32'd1;
-            end
-            if (RF_WE) begin
-                OUTPUT_PORT <= wb_write_data;
+
+                if (mem_wb_mem_write) begin
+                    // Store instruction: output store target byte address
+                    OUTPUT_PORT <= {20'd0, mem_wb_alu_result[11:0]};
+                end else if (mem_wb_jump) begin
+                    // Jump instruction: output link address / write-back data
+                    OUTPUT_PORT <= wb_write_data;
+                end else if (mem_wb_branch) begin
+                    // Branch instruction: output taken/not-taken
+                    OUTPUT_PORT <= {31'd0, mem_wb_branch_taken};
+                end else if (mem_wb_reg_write && (mem_wb_rd != 5'd0)) begin
+                    // Register-write instruction: output write-back data
+                    OUTPUT_PORT <= wb_write_data;
+                end
             end
         end
     end
@@ -512,6 +556,10 @@ module pipe_ex_mem (
     input  wire [4:0]  rd_in,
     input  wire [2:0]  funct3_in,
     input  wire [31:0] inst_in,
+    input  wire        branch_in,
+    input  wire        branch_taken_in,
+    input  wire        jump_in,
+    input  wire [11:0] branch_target_in,
 
     output reg         reg_write_out,
     output reg         mem_read_out,
@@ -521,7 +569,11 @@ module pipe_ex_mem (
     output reg  [31:0] rs2_data_out,
     output reg  [4:0]  rd_out,
     output reg  [2:0]  funct3_out,
-    output reg  [31:0] inst_out
+    output reg  [31:0] inst_out,
+    output reg         branch_out,
+    output reg         branch_taken_out,
+    output reg         jump_out,
+    output reg [11:0]  branch_target_out
 );
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin
@@ -534,6 +586,10 @@ module pipe_ex_mem (
             rd_out         <= 5'd0;
             funct3_out     <= 3'd0;
             inst_out       <= 32'h00000013;
+            branch_out     <= 1'b0;
+            branch_taken_out <= 1'b0;
+            jump_out       <= 1'b0;
+            branch_target_out <= 12'd0;
         end else begin
             reg_write_out  <= reg_write_in;
             mem_read_out   <= mem_read_in;
@@ -544,6 +600,10 @@ module pipe_ex_mem (
             rd_out         <= rd_in;
             funct3_out     <= funct3_in;
             inst_out       <= inst_in;
+            branch_out     <= branch_in;
+            branch_taken_out <= branch_taken_in;
+            jump_out       <= jump_in;
+            branch_target_out <= branch_target_in;
         end
     end
 endmodule
@@ -556,6 +616,11 @@ module pipe_mem_wb (
     input  wire        rstn,
 
     input  wire        reg_write_in,
+    input  wire        mem_write_in,
+    input  wire        branch_in,
+    input  wire        branch_taken_in,
+    input  wire        jump_in,
+    input  wire [11:0] branch_target_in,
     input  wire        mem_to_reg_in,
     input  wire [31:0] mem_data_in,
     input  wire [31:0] alu_result_in,
@@ -563,6 +628,11 @@ module pipe_mem_wb (
     input  wire [31:0] inst_in,
 
     output reg         reg_write_out,
+    output reg         mem_write_out,
+    output reg         branch_out,
+    output reg         branch_taken_out,
+    output reg         jump_out,
+    output reg [11:0]  branch_target_out,
     output reg         mem_to_reg_out,
     output reg  [31:0] mem_data_out,
     output reg  [31:0] alu_result_out,
@@ -571,19 +641,29 @@ module pipe_mem_wb (
 );
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin
-            reg_write_out  <= 1'b0;
-            mem_to_reg_out <= 1'b0;
-            mem_data_out   <= 32'd0;
-            alu_result_out <= 32'd0;
-            rd_out         <= 5'd0;
-            inst_out       <= 32'h00000013;
+            reg_write_out     <= 1'b0;
+            mem_write_out     <= 1'b0;
+            branch_out        <= 1'b0;
+            branch_taken_out  <= 1'b0;
+            jump_out          <= 1'b0;
+            branch_target_out <= 12'd0;
+            mem_to_reg_out    <= 1'b0;
+            mem_data_out      <= 32'd0;
+            alu_result_out    <= 32'd0;
+            rd_out            <= 5'd0;
+            inst_out          <= 32'h00000013;
         end else begin
-            reg_write_out  <= reg_write_in;
-            mem_to_reg_out <= mem_to_reg_in;
-            mem_data_out   <= mem_data_in;
-            alu_result_out <= alu_result_in;
-            rd_out         <= rd_in;
-            inst_out       <= inst_in;
+            reg_write_out     <= reg_write_in;
+            mem_write_out     <= mem_write_in;
+            branch_out        <= branch_in;
+            branch_taken_out  <= branch_taken_in;
+            jump_out          <= jump_in;
+            branch_target_out <= branch_target_in;
+            mem_to_reg_out    <= mem_to_reg_in;
+            mem_data_out      <= mem_data_in;
+            alu_result_out    <= alu_result_in;
+            rd_out            <= rd_in;
+            inst_out          <= inst_in;
         end
     end
 endmodule
@@ -791,31 +871,26 @@ module branch_unit (
     wire branch_lt  = ($signed(rs1_value) < $signed(rs2_value));
     wire branch_ltu = (rs1_value < rs2_value);
 
-    wire [31:0] jalr_target_full;
-    assign jalr_target_full = rs1_value + imm;
-
+    wire [31:0] branch_sum = (rs1_value + imm);
     always @(*) begin
         branch_taken  = 1'b0;
         branch_target = pc + imm[11:0];
 
         if (jump) begin
             branch_taken = 1'b1;
-
             if (opcode == 7'b1100111) begin
-                // JALR target = (rs1 + imm) & ~1
-                branch_target = jalr_target_full[11:0] & 12'hFFE;
+                branch_target = branch_sum[11:0] & 12'hFFE; // JALR
             end else begin
-                // JAL target = PC + immediate
-                branch_target = pc + imm[11:0];
+                branch_target = pc + imm[11:0]; // JAL
             end
         end else if (branch) begin
             case (funct3)
-                3'b000: branch_taken = branch_eq;    // BEQ
-                3'b001: branch_taken = ~branch_eq;   // BNE
-                3'b100: branch_taken = branch_lt;    // BLT
-                3'b101: branch_taken = ~branch_lt;   // BGE
-                3'b110: branch_taken = branch_ltu;   // BLTU
-                3'b111: branch_taken = ~branch_ltu;  // BGEU
+                3'b000: branch_taken = branch_eq;       // BEQ
+                3'b001: branch_taken = ~branch_eq;      // BNE
+                3'b100: branch_taken = branch_lt;       // BLT
+                3'b101: branch_taken = ~branch_lt;      // BGE
+                3'b110: branch_taken = branch_ltu;      // BLTU
+                3'b111: branch_taken = ~branch_ltu;     // BGEU
                 default: branch_taken = 1'b0;
             endcase
         end
