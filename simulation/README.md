@@ -91,7 +91,7 @@ This screenshot shows the partial passing result in the ModelSim transcript.
 Use a generic project path, then compile and simulate:
 
 ```tcl
-cd C:/path/to/Lab5
+cd C:/path/to/Pipelined RISC-V-CPU
 
 vlib work
 vmap work work
